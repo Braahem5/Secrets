@@ -3,8 +3,9 @@ require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
-const encrypt = require("mongoose-encryption");
 const ejs = require("ejs");
+const bcrypt =require("bcrypt");
+const saltRounds = 10;
 const _ = require("lodash");
 
 const app = express();
@@ -12,12 +13,11 @@ app.set("view engine", "ejs");
 app.use(bodyParser.urlencoded({ extended: true }));
 // for the static file like images and css files e.t.c.
 app.use(express.static("public"));
-
 const schema = mongoose.Schema;
 
 // Connect to MongoDB database
 mongoose
-  .connect("mongodb://localhost:27017/userDB", {
+  .connect("mongodb://127.0.0.1:27017/userDB", {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
@@ -40,10 +40,7 @@ const userSchema = new schema({
   },
 });
 
-userSchema.plugin(encrypt, {
-  secret: process.env.SECRET,
-  encryptedFields: ["password"],
-});
+
 
 // Create Todo model
 const User = mongoose.model("User", userSchema);
@@ -61,26 +58,33 @@ app.get("/register", (req, res) => {
 });
 
 app.post("/register", (req, res) => {
-  const newUser = new User({
-    email: req.body.username,
-    password: req.body.password,
+  bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
+    const newUser = new User({
+      email: req.body.username,
+      password: hash,
+    });
+    newUser.save().then((value) => {
+      if (value) {
+        res.render("secrets");
+      }
+    });
   });
-  newUser.save().then((value) => {
-    if (value) {
-      res.render("secrets");
-    }
-  });
+  
 });
 
 app.post("/login", (req, res) => {
+  
   const username = req.body.username;
   const password = req.body.password;
 
   User.findOne({ email: username }).then((value, err) => {
     if (value) {
-      if (value.password === password) {
-        res.render("secrets");
-      }
+      bcrypt.compare(password, value.password, function (err, result) {
+        if (result === true){
+          res.render("secrets");
+        }
+      }); 
+      
     } else {
       console.log(err);
     }
