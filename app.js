@@ -60,14 +60,14 @@ const User = mongoose.model("User", userSchema);
 passport.use(User.createStrategy());
 
 passport.serializeUser(function (user, cb) {
-  cb(null, { id: user.id, username: user.username, name: user.name });
-  // process.nextTick(function () {
-  // });
+   process.nextTick(function() {
+    cb(null, { id: user.id, username: user.username, name: user.name });
+  });
 });
 
 passport.deserializeUser(function (user, cb) {
-  User.findById().then(() => {
-    cb(null, user);
+  process.nextTick(function() {
+    return cb(null, user);
   });
 });
 
