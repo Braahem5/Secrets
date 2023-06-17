@@ -8,6 +8,7 @@ const passport = require("passport");
 const passportLocalMongoose = require("passport-local-mongoose");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const findOrCreate = require("mongoose-findorcreate");
+const VKontakteStrategy = require("passport-vkontakte").Strategy;
 const ejs = require("ejs");
 const _ = require("lodash");
 const Schema = mongoose.Schema;
@@ -47,6 +48,7 @@ const userSchema = new Schema({
   email: String,
   password: String,
   googleId: String,
+  vkontakteId: String,
 });
 
 /*************Password encryption *****************/
@@ -60,14 +62,14 @@ const User = mongoose.model("User", userSchema);
 passport.use(User.createStrategy());
 
 passport.serializeUser(function (user, cb) {
-  cb(null, { id: user.id, username: user.username, name: user.name });
-  // process.nextTick(function () {
-  // });
+  process.nextTick(function () {
+    cb(null, { id: user.id, username: user.username, name: user.name });
+  });
 });
 
 passport.deserializeUser(function (user, cb) {
-  User.findById().then(() => {
-    cb(null, user);
+  process.nextTick(function () {
+    return cb(null, user);
   });
 });
 
@@ -80,10 +82,37 @@ passport.use(
       userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo",
     },
     function (accessToken, refreshToken, profile, cb) {
-      // console.log(profile);
       User.findOrCreate({ googleId: profile.id }, function (err, user) {
         return cb(err, user);
       });
+    }
+  )
+);
+
+passport.use(
+  new VKontakteStrategy(
+    {
+      ...{
+        clientID: process.env.APP_ID, // VK.com docs call it 'API ID'
+        clientSecret: process.env.SECURE_KEY,
+        callbackURL: "http://localhost:3000/auth/vkontakte/callback",
+      },
+      scope: ["email", "age", "gender"],
+      profileFields: ["email", "city", "bdate"],
+    },
+    function myVerifyCallbackFn(
+      accessToken,
+      refreshToken,
+      params,
+      profile,
+      done
+    ) {
+      //find or create a user with the vk Id in local database.
+      User.findOrCreate({ vkontakteId: profile.id })
+        .then(function (user) {
+          done(null, user);
+        })
+        .catch(done);
     }
   )
 );
@@ -103,6 +132,22 @@ app.get(
     // Successful authentication, redirect secrets route.
     res.redirect("/secrets");
   }
+);
+
+//This function will pass callback, scope and request new token
+app.get(
+  "/auth/vkontakte",
+  passport.authenticate("vkontakte", {
+    scope: ["status", "email", "friends", "notify"],
+  })
+);
+
+app.get(
+  "/auth/vkontakte/callback",
+  passport.authenticate("vkontakte", {
+    successRedirect: "/secrets",
+    failureRedirect: "/login",
+  })
 );
 
 app.get("/login", (req, res) => {
