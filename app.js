@@ -49,6 +49,7 @@ const userSchema = new Schema({
   password: String,
   googleId: String,
   vkontakteId: String,
+  secret: String,
 });
 
 /*************Password encryption *****************/
@@ -159,11 +160,30 @@ app.get("/register", (req, res) => {
 });
 
 app.get("/secrets", (req, res) => {
+  User.find({ secret: { $ne: null } }).then((foundUser) => {
+    res.render("secrets", { usersWithSecrets: foundUser });
+  });
+});
+
+app.get("/submit", (req, res) => {
   if (req.isAuthenticated()) {
-    res.render("secrets");
+    res.render("submit");
   } else {
     res.redirect("/login");
   }
+});
+
+app.post("/submit", (req, res) => {
+  const submittedSecret = req.body.secret;
+
+  User.findById(req.user.id).then((foundUser) => {
+    if (foundUser) {
+      foundUser.secret = submittedSecret;
+      foundUser.save().then(() => {
+        res.redirect("/secrets");
+      });
+    }
+  });
 });
 
 app.get("/logout", (req, res) => {
